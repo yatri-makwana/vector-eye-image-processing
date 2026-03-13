@@ -85,9 +85,11 @@ class Settings(BaseSettings):
     def cvat_webhook_secret(self) -> str:
         return self.eye_cvat_webhook_secret
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "allow"
+    }
 
 
 def get_settings() -> Settings:
