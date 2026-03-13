@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 class OllamaConfig(BaseModel):
     """Ollama service configuration"""
     base_url: str = Field(default="http://localhost:11434")
-    default_model: str = Field(default="gemma2:2b")
+    default_model: str = Field(default="llava:7b")
+    default_vision_model: str = Field(default="llava:7b")
     timeout: int = Field(default=300)
     max_retries: int = Field(default=3)
     enable_gpu: bool = Field(default=False)
@@ -282,7 +283,7 @@ class OllamaService:
         
         Args:
             messages: List of messages with 'role', 'content', and optionally 'images'
-            model: Model to use (defaults to gemma3:12b)
+            model: Model to use (defaults to vision model)
             temperature: Sampling temperature
         
         Returns:
@@ -291,7 +292,7 @@ class OllamaService:
         if not self._initialized:
             await self.initialize()
         
-        model = model or self.config.default_model
+        model = model or self.config.default_vision_model
         
         # Ensure model is available
         await self.ensure_model_pulled(model)
