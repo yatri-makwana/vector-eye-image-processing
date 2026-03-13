@@ -17,8 +17,7 @@ echo "EYE_ENVIRONMENT=development" > .env
 echo "EYE_DATABASE_URL=sqlite:///./eye.db" >> .env
 
 # Run backend
-PYTHONPATH=/Users/dhawansolanki/DEV/yatri/eye uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-```
+PYTHONPATH = "C:\Users\lenovo\eye"; uvicorn main:app --host 0.0.0.0 --port 8001 --reload```
 
 ## Frontend Setup
 ```bash
