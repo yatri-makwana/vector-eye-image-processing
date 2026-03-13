@@ -18,6 +18,7 @@ import pandas as pd
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, Boolean, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from config import settings
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import redis
 from concurrent.futures import ThreadPoolExecutor
@@ -181,7 +182,7 @@ for directory in [ANNOTATIONS_DIR, PROJECTS_DIR, TASKS_DIR, IMAGES_DIR, EXPORTS_
     directory.mkdir(parents=True, exist_ok=True)
 
 # Database setup
-DATABASE_URL = "postgresql://vision:vision@db:5433/vision"
+DATABASE_URL = settings.eye_database_url or "sqlite:///./eye.db"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
