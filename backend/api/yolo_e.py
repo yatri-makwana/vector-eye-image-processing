@@ -90,6 +90,7 @@ class YOLOEDetectionResult(BaseModel):
     confidence_scores: List[float]
     class_names: List[str]
     bounding_boxes: List[List[float]]
+    annotated_image: Optional[str] = None  # Base64 encoded annotated image
 
 class YOLOEModelLoadRequest(BaseModel):
     """YOLO-E model load request"""
@@ -716,6 +717,27 @@ async def infer_single_image(
             # Run inference
             results = model(temp_file_path, device=device, conf=confidence_threshold, iou=iou_threshold)
             
+            # Generate annotated image
+            annotated_image_b64 = None
+            try:
+                # Save the annotated result to a temporary file
+                annotated_temp_path = temp_file_path.replace('.', '_annotated.')
+                results[0].save(annotated_temp_path)
+                
+                # Read the annotated image and convert to base64
+                import base64
+                with open(annotated_temp_path, 'rb') as f:
+                    annotated_image_bytes = f.read()
+                    annotated_image_b64 = base64.b64encode(annotated_image_bytes).decode('utf-8')
+                
+                # Clean up temporary annotated file
+                try:
+                    os.unlink(annotated_temp_path)
+                except:
+                    pass
+            except Exception as e:
+                print(f"Warning: Failed to generate annotated image: {e}")
+            
             # Process results
             detections = []
             if results and len(results) > 0:
@@ -743,7 +765,8 @@ async def infer_single_image(
                 confidence_scores=[det["confidence"] for det in detections],
                 class_ids=[det["class_id"] for det in detections],
                 class_names=[det["class_name"] for det in detections],
-                bounding_boxes=[det["bbox"] for det in detections]
+                bounding_boxes=[det["bbox"] for det in detections],
+                annotated_image=annotated_image_b64
             )
             
             return result
