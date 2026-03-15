@@ -22,7 +22,8 @@ with open(image_path, 'rb') as f:
         'model_path': 'yolo11n.pt',
         'confidence_threshold': 0.5,
         'iou_threshold': 0.45,
-        'use_gpu': True  # Test with GPU requested but not available
+        'use_gpu': True,  # Test with GPU requested but not available
+        'custom_classes': 'person,bottle,car',  # Test custom classes with YOLO11 (should show warning)
     }
     
     try:

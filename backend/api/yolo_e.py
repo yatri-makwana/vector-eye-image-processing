@@ -690,16 +690,24 @@ async def infer_single_image(
             
             # Handle different prompt modes according to YOLOE documentation
             if prompt_mode == "text" and custom_classes:
-                # Text prompting: Use custom classes with set_classes
+                # Text prompting: Use custom classes with set_classes (only available on YOLO-E models)
                 class_list = [cls.strip() for cls in custom_classes.split(",") if cls.strip()]
                 if class_list:
-                    # Get text embeddings for the classes
                     try:
-                        text_pe = model.get_text_pe(class_list)
-                        model.set_classes(class_list, text_pe)
-                    except AttributeError:
-                        # Fallback if get_text_pe is not available
-                        model.set_classes(class_list)
+                        # Check if this is a YOLO-E model that supports set_classes
+                        if hasattr(model, 'set_classes'):
+                            # Get text embeddings for the classes
+                            try:
+                                text_pe = model.get_text_pe(class_list)
+                                model.set_classes(class_list, text_pe)
+                            except AttributeError:
+                                # Fallback if get_text_pe is not available
+                                model.set_classes(class_list)
+                        else:
+                            # Standard YOLO11 model - ignore custom classes and use default classes
+                            print(f"Warning: Model {model_path} does not support custom classes. Using default classes.")
+                    except Exception as e:
+                        print(f"Warning: Failed to set custom classes: {e}. Using default classes.")
             elif prompt_mode == "internal":
                 # Use internal vocabulary (1200+ base classes) - default behavior
                 pass
