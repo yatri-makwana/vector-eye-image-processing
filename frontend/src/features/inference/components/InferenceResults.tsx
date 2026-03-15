@@ -27,6 +27,7 @@ export const InferenceResults = ({
   promptMode
 }: InferenceResultsProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showAnnotated, setShowAnnotated] = useState<boolean>(true);
   const { performInference } = useInferenceAPI();
 
   // Handle image preview
@@ -59,11 +60,18 @@ export const InferenceResults = ({
   const renderImagePreview = () => {
     if (!imagePreview) return null;
 
+    // Use annotated image if available and toggle is on, otherwise use original
+    const displayImage = (inferenceResults?.annotated_image && showAnnotated)
+      ? `data:image/jpeg;base64,${inferenceResults.annotated_image}`
+      : imagePreview;
+
+    const hasAnnotation = inferenceResults?.annotated_image && showAnnotated;
+
     return (
       <div className="relative">
         <img
-          src={imagePreview}
-          alt="Uploaded image"
+          src={displayImage}
+          alt={hasAnnotation ? "Annotated inference result" : "Uploaded image"}
           className="w-full h-auto max-h-96 object-contain rounded-lg border border-gray-700"
         />
         {isProcessing && (
@@ -72,6 +80,23 @@ export const InferenceResults = ({
               <div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full mx-auto mb-2"></div>
               <p className="text-sm">Processing...</p>
             </div>
+          </div>
+        )}
+        {/* Image type indicator */}
+        {hasAnnotation && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
+            Annotated
+          </div>
+        )}
+        {/* Toggle button for annotated/original view */}
+        {inferenceResults?.annotated_image && (
+          <div className="absolute top-2 left-2">
+            <button
+              onClick={() => setShowAnnotated(!showAnnotated)}
+              className="bg-black bg-opacity-75 text-white text-xs px-3 py-1 rounded border border-gray-600 hover:bg-opacity-90 transition-colors"
+            >
+              {showAnnotated ? 'Show Original' : 'Show Annotated'}
+            </button>
           </div>
         )}
       </div>
@@ -102,11 +127,15 @@ export const InferenceResults = ({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Processing Time:</span>
-              <span className="text-white">{inferenceResults.processing_time || 'N/A'}ms</span>
+              <span className="text-white">{(inferenceResults.processing_time * 1000).toFixed(0)}ms</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Model:</span>
               <span className="text-white">{selectedModel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Annotated:</span>
+              <span className="text-white">{inferenceResults.annotated_image ? 'Yes' : 'No'}</span>
             </div>
           </div>
         </div>
@@ -120,7 +149,7 @@ export const InferenceResults = ({
                 <div key={index} className="flex items-center justify-between p-2 bg-gray-900 rounded border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-3 h-3 bg-white rounded-full"></div>
-                    <span className="text-sm text-white">{detection.label}</span>
+                    <span className="text-sm text-white">{detection.class_name}</span>
                   </div>
                   <div className="flex items-center space-x-4">
                     <span className="text-xs text-gray-400">
@@ -156,7 +185,9 @@ export const InferenceResults = ({
       {/* Image Preview */}
       {imagePreview && (
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Uploaded Image</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">
+            {inferenceResults?.annotated_image && showAnnotated ? 'Annotated Result' : 'Original Image'}
+          </h3>
           {renderImagePreview()}
         </div>
       )}
