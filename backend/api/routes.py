@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Body
 from pydantic import BaseModel
 from typing import Dict
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
 from storage.adapters.s3 import S3Adapter
 from config import settings
 import uuid

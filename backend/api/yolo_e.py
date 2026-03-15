@@ -4,8 +4,11 @@ YOLO-E API endpoints for high-performance object detection and few-shot learning
 import os
 import json
 import uuid
-from typing import Dict, List, Optional, Any
+import sys
 from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -96,7 +99,7 @@ class YOLOEModelLoadRequest(BaseModel):
     config_path: Optional[str] = None
 
 @router.post("/v1/yolo-e/models/load")
-async def load_yolo_e_model(request: YOLOEModelLoadRequest) -> Dict[str, str]:
+async def load_yolo_e_model(request: YOLOEModelLoadRequest) -> Dict[str, Any]:
     """
     Load YOLO-E model for inference and training
     
@@ -113,10 +116,11 @@ async def load_yolo_e_model(request: YOLOEModelLoadRequest) -> Dict[str, str]:
         
         model_id = str(uuid.uuid4())
         
-        # Validate model path exists
-        model_full_path = f"/app/storage/weights/yolo_e/base/{request.model_path}"
-        if not os.path.exists(model_full_path):
-            raise HTTPException(status_code=404, detail="Model file not found")
+        # Validate model path exists (use relative path for cross-platform compatibility)
+        base_storage_path = Path(__file__).parent.parent.parent / "storage" / "weights" / "yolo_e" / "base"
+        model_full_path = base_storage_path / request.model_path
+        if not model_full_path.exists():
+            raise HTTPException(status_code=404, detail=f"Model file not found: {request.model_path}")
         
         # Load the actual YOLO-E model using ultralytics
         try:
@@ -131,26 +135,25 @@ async def load_yolo_e_model(request: YOLOEModelLoadRequest) -> Dict[str, str]:
             is_segmentation = "seg" in model_name
             
             # Store model info globally
-            global _loaded_yolo_e_model_info
-            _loaded_yolo_e_model_info = YOLOEModelInfo(
-                model_id=model_id,
-                name=f"YOLO-E Model - {model_name}",
-                model_type="YOLO-E",
-                max_classes=1200,  # LVIS + Objects365 categories
-                few_shot_support=True,
-                loaded_classes=1200,
-                device="cpu",  # Will be updated based on actual device
-                confidence_threshold=0.5,
-                iou_threshold=0.45,
-                status="loaded"
-            )
+            model_info = {
+                "model_id": model_id,
+                "name": f"YOLO-E Model - {model_name}",
+                "model_type": "YOLO-E",
+                "max_classes": 1200,  # LVIS + Objects365 categories
+                "few_shot_support": True,
+                "loaded_classes": 1200,
+                "device": "cpu",  # Will be updated based on actual device
+                "confidence_threshold": 0.5,
+                "iou_threshold": 0.45,
+                "status": "loaded"
+            }
             
             return {
                 "model_id": model_id,
                 "status": "loaded",
                 "model_path": request.model_path,
                 "message": "YOLO-E model loaded successfully",
-                "model_info": _loaded_yolo_e_model_info.dict(),
+                "model_info": model_info,
                 "capabilities": {
                     "prompt_free": is_prompt_free,
                     "segmentation": is_segmentation,
@@ -186,13 +189,15 @@ async def start_training(request: YOLOETrainingRequest) -> YOLOETrainingJob:
         job_id = str(uuid.uuid4())
         
         # Validate dataset path
-        dataset_path = f"/app/storage/datasets/{request.project_name}/{request.dataset_path}"
-        if not os.path.exists(dataset_path):
+        base_storage_path = Path(__file__).parent.parent.parent / "storage" / "datasets"
+        dataset_path = base_storage_path / request.project_name / request.dataset_path
+        if not dataset_path.exists():
             raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_path}")
         
         # Validate base model
-        base_model_path = f"/app/storage/weights/yolo_e/base/{request.base_model}"
-        if not os.path.exists(base_model_path):
+        base_models_path = Path(__file__).parent.parent.parent / "storage" / "weights" / "yolo_e" / "base"
+        base_model_path = base_models_path / request.base_model
+        if not base_model_path.exists():
             raise HTTPException(status_code=404, detail=f"Base model not found: {request.base_model}")
         
         # Create training job
@@ -297,7 +302,8 @@ async def upload_dataset(
         from pathlib import Path
         
         # Create dataset directory
-        dataset_dir = Path(f"/app/storage/datasets/{project_name}/{dataset_name}")
+        base_storage_path = Path(__file__).parent.parent.parent / "storage" / "datasets"
+        dataset_dir = base_storage_path / project_name / dataset_name
         dataset_dir.mkdir(parents=True, exist_ok=True)
         
         # Create subdirectories
@@ -361,7 +367,7 @@ async def get_datasets(project_name: Optional[str] = None) -> List[Dict[str, Any
     """
     try:
         datasets = []
-        datasets_dir = Path("/app/storage/datasets")
+        datasets_dir = Path(__file__).parent.parent.parent / "storage" / "datasets"
         
         if project_name:
             project_dir = datasets_dir / project_name
@@ -409,7 +415,7 @@ async def get_trained_models(project_name: Optional[str] = None) -> List[Dict[st
     """
     try:
         models = []
-        models_dir = Path("/app/storage/weights/yolo_e/trained")
+        models_dir = Path(__file__).parent.parent.parent / "storage" / "weights" / "yolo_e" / "trained"
         
         if project_name:
             project_dir = models_dir / project_name
@@ -495,8 +501,15 @@ async def infer_with_trained_model(
             # Load trained model
             model = YOLO(model_path)
             
-            # Set device (GPU/CPU)
-            device = "cuda" if use_gpu else "cpu"
+            # Set device (GPU/CPU) - check if CUDA is actually available
+            if use_gpu:
+                try:
+                    import torch
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                except ImportError:
+                    device = "cpu"
+            else:
+                device = "cpu"
             
             # Run inference
             results = model(temp_file_path, device=device, conf=confidence_threshold, iou=iou_threshold)
@@ -657,15 +670,23 @@ async def infer_single_image(
             from ultralytics import YOLO
             
             # Construct model path
-            model_full_path = f"/app/storage/weights/yolo_e/base/{model_path}"
-            if not os.path.exists(model_full_path):
+            base_models_path = Path(__file__).parent.parent.parent / "storage" / "weights" / "yolo_e" / "base"
+            model_full_path = base_models_path / model_path
+            if not model_full_path.exists():
                 raise HTTPException(status_code=404, detail=f"Model file not found: {model_path}")
             
             # Load model
             model = YOLO(model_full_path)
             
-            # Set device (GPU/CPU)
-            device = "cuda" if use_gpu else "cpu"
+            # Set device (GPU/CPU) - check if CUDA is actually available
+            if use_gpu:
+                try:
+                    import torch
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                except ImportError:
+                    device = "cpu"
+            else:
+                device = "cpu"
             
             # Handle different prompt modes according to YOLOE documentation
             if prompt_mode == "text" and custom_classes:
@@ -739,7 +760,8 @@ async def get_base_classes() -> Dict[str, Any]:
     """
     try:
         # Load a YOLOE model to get the base classes
-        model_full_path = "/app/storage/weights/yolo_e/base/yoloe-11s-seg.pt"
+        base_models_path = Path(__file__).parent.parent.parent / "storage" / "weights" / "yolo_e" / "base"
+        model_full_path = base_models_path / "yoloe-11s-seg.pt"
         if os.path.exists(model_full_path):
             from ultralytics import YOLO
             model = YOLO(model_full_path)
